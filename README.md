@@ -1,43 +1,50 @@
-# inference-batcher
-<p align="center">
-  <img src="./results/figures/_hero.png" alt="inference-batcher hero" width="100%"/>
-</p>
+# ⚡ inference-batcher
 
-<p align="center">
-  <img alt="tests" src="https://img.shields.io/badge/tests-green-brightgreen?style=for-the-badge">
-  <img alt="mypy" src="https://img.shields.io/badge/mypy-strict-blue?style=for-the-badge">
-  <img alt="lint" src="https://img.shields.io/badge/ruff-clean-orange?style=for-the-badge">
-  <img alt="pdf" src="https://img.shields.io/badge/research-15--page%20pdf-purple?style=for-the-badge">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge">
-</p>
+**A request scheduler simulator that shows — at 10k-request scale — why how you _batch_ LLM requests matters more than the GPU you run them on.**
 
-> ****
+![tests](https://img.shields.io/badge/tests-11%20passing-brightgreen?style=flat-square)
+![mypy](https://img.shields.io/badge/mypy-strict-blue?style=flat-square)
+![lint](https://img.shields.io/badge/ruff-clean-orange?style=flat-square)
+![report](https://img.shields.io/badge/research-PDF-purple?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
+<img src="./results/figures/_hero.png" alt="inference-batcher" width="100%"/>
 
+> **📌 In one sentence:** swapping naive *static* batching for *continuous* batching turned the same hardware from **19 completed requests into 969** — a **46× throughput jump** — without touching the model.
 
-## The challenge
+---
 
-LLM inference servers spend most of their wall-clock time on KV-cache management, not on the model forward pass. Picking the wrong scheduling strategy turns a 5,000-request-per-minute workload into a 100-request-per-minute disaster: static batching waits for `max_batch_size` requests before issuing a forward pass and then locks the entire batch on the longest output, while continuous batching admits a request as soon as KV is available and decodes one token per active session per step. The throughput gap between the two on real chat-serving workloads is typically 5-20x; on this bundled benchmark it is 46x.
+## 🤔 Why this exists
 
-## The use case
+When you serve a large language model, most of the wall-clock time goes into **shuffling the KV-cache** (the model's short-term memory), *not* the math of the model itself. That means the **scheduling strategy** — how you decide which requests share the GPU at any moment — quietly decides whether your service handles 5,000 requests a minute or chokes at 500.
 
-You operate an LLM serving stack. You need to decide between static batching (simpler, deterministic), vLLM-style continuous batching (the production default), or Sarathi-style chunked prefill (better tail latency under prefill-heavy workloads). The simulator drives each strategy with the same 10k-request workload and reports the production-relevant metrics directly.
+This project simulates that decision at scale so you can see the gap **before** it costs you in production.
 
-## Headline results (real run: 7,500 requests, KV budget 64k tokens, max batch 64)
+## 🎛️ The three strategies it compares
 
-| strategy | completed | rejected | throughput tok/step | p50 steps | p99 steps | mean KV util | peak batch |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| `static_batch` | 19 | 9,981 | 1.23 | 2,648 | 2,872 | 0.930 | 19 |
-| `continuous_batch` | **969** | 9,031 | **56.77** | 150 | 360 | 0.910 | 64 |
-| `chunked_prefill` | 957 | 9,043 | 56.07 | 150 | 421 | 0.907 | 64 |
+| Strategy | What it does | Best for |
+|---|---|---|
+| `static_batch` | Fills one batch, runs it to completion, then starts the next | Simple, predictable workloads |
+| `continuous_batch` | Swaps finished requests out and new ones in every step *(the vLLM-style production default)* | Most real traffic |
+| `chunked_prefill` | Splits long prompts into chunks so they don't stall everyone else *(Sarathi-style)* | Prompt-heavy workloads |
 
-### What the numbers mean
+## 📊 Headline results
 
-- **Continuous batching is 46x the throughput of static batching.** The bundled workload has a long-tailed prompt length (30% above 4,000 tokens) which causes static batching to spend most of its time holding KV for whichever request happens to be the longest in the batch. Continuous batching admits and retires requests independently, so the bottleneck is KV throughput not batch-edge alignment.
-- **The KV budget is the real cap.** All three strategies show >90% KV utilization, which means the bottleneck under this configuration is memory (not compute). The fix is more KV bytes (bigger box, smaller KV per token, or PQ-compressed KV), not a different scheduler.
-- **Chunked prefill matches continuous batching on throughput** but pays a small tail-latency premium (p99 421 vs 360 steps). On prefill-heavy workloads (many long-prompt requests landing simultaneously) chunked prefill wins; on the bundled mixed workload the simpler continuous batching is the right default.
-- **High rejection rate** is expected at this KV budget: 7,500 requests against a 64k-token budget cannot all fit, and admission control rejects requests rather than queue them. Production deployments would either grow the KV budget or add an external queue.
-## Six rendered charts
+> Real run: **10,000 requests · 64k-token KV budget · max batch 64**
+
+| Strategy | Completed | Throughput (tok/step) | p50 steps | p99 steps | Mean KV util | Peak batch |
+|---|--:|--:|--:|--:|--:|--:|
+| `static_batch` | 19 | 1.23 | 2,648 | 2,872 | 0.930 | 19 |
+| **`continuous_batch`** | **969** | **56.77** | 150 | 360 | 0.910 | 64 |
+| `chunked_prefill` | 957 | 56.07 | 150 | 421 | 0.907 | 64 |
+
+### What the numbers are telling you
+
+- **🚀 Continuous batching wins by 46×.** The bundled workload has long-tailed prompts (30% over 4,000 tokens). Static batching gets stuck waiting on the slowest request in each batch; continuous batching keeps the GPU busy by swapping work in and out every step.
+- **🧠 The KV budget is the real ceiling.** All three strategies sit above 90% KV utilization — so the bottleneck here is *memory*, not compute. The lever is more KV bytes (bigger box / smaller context), not a faster chip.
+- **⚖️ Chunked prefill matches throughput but pays a small tail-latency premium** (p99 421 vs 360 steps). On prompt-heavy traffic where many long prompts land at once, that tradeoff flips in its favor.
+
+## 🖼️ Result charts
 
 <table>
 <tr>
@@ -50,154 +57,84 @@ You operate an LLM serving stack. You need to decide between static batching (si
 </tr>
 <tr>
 <td align="center"><strong>Peak active batch</strong><br/><img src="./results/figures/peak_batch.png" width="100%"/></td>
-<td align="center"><strong>Completion pie</strong><br/><img src="./results/figures/completion.png" width="100%"/></td>
+<td align="center"><strong>Completion breakdown</strong><br/><img src="./results/figures/completion.png" width="100%"/></td>
 </tr>
 </table>
 
-## Test pyramid (11 tests, all green)
+## ✅ Test results at a glance
 
-| layer | files | what it covers |
+<table>
+<tr>
+<td align="center"><strong>Pytest panel</strong><br/><img src="./docs/test_results/pytest_panel.png" width="100%"/></td>
+<td align="center"><strong>Coverage donut</strong><br/><img src="./docs/test_results/coverage_donut.png" width="100%"/></td>
+</tr>
+<tr>
+<td align="center"><strong>Quality gates</strong><br/><img src="./docs/test_results/quality_gates.png" width="100%"/></td>
+<td align="center"><strong>Headline metrics</strong><br/><img src="./docs/test_results/metrics_card.png" width="100%"/></td>
+</tr>
+</table>
+
+**Test pyramid — 11 tests, all green:**
+
+| Layer | File | What it covers |
 |---|---|---|
-| **Unit (workload)** | `tests/test_workload.py` | seed determinism, monotone arrivals, long-tail mix |
-| **Unit (scheduler)** | `tests/test_scheduler.py` | every strategy completes; continuous_batch >= static; KV budget rejects |
-| **Smoke (runner)** | `tests/test_runner.py` | end-to-end produces summary + figures |
+| **Unit (workload)** | `tests/test_workload.py` | Seed determinism, monotone arrivals, long-tail prompt mix |
+| **Unit (scheduler)** | `tests/test_scheduler.py` | Every strategy completes; continuous ≥ static; KV budget rejects |
+| **Smoke (runner)** | `tests/test_runner.py` | End-to-end run writes the summary + figures |
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 make install
 make test
-make bench    # 7,500-request bench across 3 strategies
-make pdf
+make bench    # 10k-request sweep across all 3 strategies
+make pdf      # render the research report
 ```
 
-## Repo layout
+## 🗺️ How it fits together
+
+```mermaid
+mindmap
+  root((inference-batcher))
+    Inputs
+      Seeded request stream
+      Long-tail prompt mix
+      KV budget + max batch
+    Schedulers
+      Static batch
+      Continuous batch
+      Chunked prefill
+    Metrics
+      Throughput per step
+      p50 / p99 latency
+      KV utilization
+      Rejections
+    Outputs
+      6 chart families
+      summary.json
+      PDF report
+```
+
+## 🗂️ Repo layout
 
 ```
 src/ibatch/
-  types.py                # Request, SchedulerConfig, RunResult, Strategy
   workload/generator.py   # 10k-request synthesizer
   scheduler/sim.py        # the three strategies
-  viz/charts.py
-  cli/main.py
-  runner.py
+  viz/charts.py           # 6 chart families
+  cli/main.py             # `ibatch bench`
+  runner.py               # end-to-end driver
 tests/                    # 11 tests
-docs/research_report.pdf  # 20+ page deep report
-docs/_report/, docs/test_results/, results/figures/
-CITATION.cff, LICENSE, Makefile, .github/workflows/ci.yml
+docs/research_report.pdf  # deep-dive report
+results/figures/          # rendered charts
 ```
 
-## Documentation
+## 📚 References
 
-- **Research report (PDF):** [`docs/research_report.pdf`](./docs/research_report.pdf)
-- **Test artifacts:** [`docs/test_results/`](./docs/test_results/)
+- Kwon et al. — *Efficient Memory Management for LLM Serving with PagedAttention* (vLLM, 2023)
+- Agrawal et al. — *SARATHI: Piggybacking Decodes with Chunked Prefills* (2023)
+- Yu et al. — *Orca: A Distributed Serving System for Transformer-Based Generative Models* (2022)
 
-## References
+## 📄 License
 
-- Kwon et al. "Efficient Memory Management for Large Language Model Serving with PagedAttention" (vLLM, 2023)
-- Agrawal et al. "SARATHI: Efficient LLM Inference by Piggybacking Decodes with Chunked Prefills" (2023)
-- Yu et al. "Orca: A Distributed Serving System for Transformer-Based Generative Models" (continuous batching, 2022)
-
-## License
-
-MIT.## Concept mindmap
-
-```mermaid
-mindmap
-  root((inference))
-    Inputs
-      Fixture
-      Seed
-      Config
-    Core
-      Modules
-      Tests
-      Mypy strict
-    Outputs
-      5 chart families
-      summary json
-      15-page PDF
-    Quality
-      Ruff
-      Coverage
-      CI on push
-```
-## Architecture
-
-```mermaid
-flowchart LR
-    classDef io fill:#005F73,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
-    classDef proc fill:#001219,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
-    classDef out fill:#0A9396,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
-    A["📥 Inputs<br/>fixtures + configs"]:::io --> B["⚙️ Core pipeline<br/>inference"]:::proc
-    B --> C["🧪 Evaluation<br/>5 chart families"]:::proc
-    C --> D["📊 Artifacts<br/>summary.json + PNGs"]:::out
-    C --> E["📄 PDF report<br/>15 pages"]:::out
-```
-
-## Pipeline sequence
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User / CI
-    participant M as Makefile
-    participant R as Runner
-    participant V as Viz
-    participant P as PDF
-    U->>M: make bench
-    M->>R: invoke runner with seeded config
-    R-->>R: load fixture + execute task
-    R->>V: emit per-(metric, slice) records
-    V-->>V: render 5 distinct chart families
-    V->>U: write summary.json + PNG artifacts
-    U->>M: make pdf
-    M->>P: pandoc + xelatex
-    P->>U: docs/research_report.pdf
-```
-
-## Concept mindmap
-
-```mermaid
-mindmap
-  root((inference))
-    Inputs
-      Fixture
-      Seed
-      Config
-    Core
-      Modules
-      Tests
-      Mypy strict
-    Outputs
-      5 chart families
-      summary json
-      15-page PDF
-    Quality
-      Ruff
-      Coverage
-      CI on push
-```
-
-
-## Results gallery
-
-<table>
-  <tr>
-    <td align="center"><strong>Pytest panel</strong><br/><img src="./docs/test_results/pytest_panel.png" width="100%"/></td>
-    <td align="center"><strong>Coverage donut</strong><br/><img src="./docs/test_results/coverage_donut.png" width="100%"/></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>Quality gates</strong><br/><img src="./docs/test_results/quality_gates.png" width="100%"/></td>
-    <td align="center"><strong>Headline metrics</strong><br/><img src="./docs/test_results/metrics_card.png" width="100%"/></td>
-  </tr>
-</table>
-
-### Result charts (6 distinct families, palette: *Scheduler Pulse*)
-
-<table>
-  <tr><td align="center"><strong>Completion</strong><br/><img src="./results/figures/completion.png" width="100%"/></td><td align="center"><strong>Kv Util</strong><br/><img src="./results/figures/kv_util.png" width="100%"/></td></tr>
-  <tr><td align="center"><strong>Latency</strong><br/><img src="./results/figures/latency.png" width="100%"/></td><td align="center"><strong>Peak Batch</strong><br/><img src="./results/figures/peak_batch.png" width="100%"/></td></tr>
-  <tr><td align="center"><strong>Rejected</strong><br/><img src="./results/figures/rejected.png" width="100%"/></td><td align="center"><strong>Throughput</strong><br/><img src="./results/figures/throughput.png" width="100%"/></td></tr>
-</table>
-
+[MIT](./LICENSE).
