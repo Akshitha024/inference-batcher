@@ -12,7 +12,7 @@ typecheck:
 test:
 	uv run pytest -v
 bench:
-	uv run ibatch bench --out-dir runs/latest --n 10000
+	uv run ibatch bench --out-dir runs/latest --n 7500
 pdf:
 	cd docs/_report && pandoc research_report.md -o ../research_report.pdf \
 	    --pdf-engine=xelatex --toc --toc-depth=2 --number-sections \
