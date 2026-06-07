@@ -11,19 +11,9 @@
   <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge">
 </p>
 
-> **Continuous-batching inference scheduler simulator: static vs vLLM vs Sarathi at 10k requests. 46x throughput gap.**
+> ****
 
 
-
-<p align="center">
-  <img alt="scale" src="https://img.shields.io/badge/scale-10k%20requests-blueviolet?style=for-the-badge">
-  <img alt="speedup" src="https://img.shields.io/badge/continuous%20vs%20static-46x-2ecc71?style=for-the-badge">
-  <img alt="kv" src="https://img.shields.io/badge/kv%20budget-tracked-orange?style=for-the-badge">
-  <img alt="mypy" src="https://img.shields.io/badge/mypy-strict-blue?style=for-the-badge">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge">
-</p>
-
-> **Continuous-batching inference scheduler simulator.** Models static batching vs vLLM-style continuous batching vs Sarathi-style chunked prefill at **10,000-request scale** with realistic chat-serving workload. Reports tokens/step throughput, latency percentiles, KV-budget utilization, admission-control rejection, and peak active batch size.
 
 ## The challenge
 
@@ -110,15 +100,37 @@ CITATION.cff, LICENSE, Makefile, .github/workflows/ci.yml
 
 ## License
 
-MIT.
+MIT.## Concept mindmap
+
+```mermaid
+mindmap
+  root((inference))
+    Inputs
+      Fixture
+      Seed
+      Config
+    Core
+      Modules
+      Tests
+      Mypy strict
+    Outputs
+      5 chart families
+      summary json
+      15-page PDF
+    Quality
+      Ruff
+      Coverage
+      CI on push
+```
+
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    classDef io fill:#3b6fa1,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
-    classDef proc fill:#3b6fa1,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
-    classDef out fill:#5b8d4a,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
+    classDef io fill:#005F73,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
+    classDef proc fill:#001219,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
+    classDef out fill:#0A9396,stroke:#1c1c1c,stroke-width:1.5px,color:#fff
     A["📥 Inputs<br/>fixtures + configs"]:::io --> B["⚙️ Core pipeline<br/>inference"]:::proc
     B --> C["🧪 Evaluation<br/>5 chart families"]:::proc
     C --> D["📊 Artifacts<br/>summary.json + PNGs"]:::out
@@ -183,7 +195,7 @@ mindmap
   </tr>
 </table>
 
-### Result charts (6 distinct families, palette: *Default*)
+### Result charts (6 distinct families, palette: *Scheduler Pulse*)
 
 <table>
   <tr><td align="center"><strong>Completion</strong><br/><img src="./results/figures/completion.png" width="100%"/></td><td align="center"><strong>Kv Util</strong><br/><img src="./results/figures/kv_util.png" width="100%"/></td></tr>

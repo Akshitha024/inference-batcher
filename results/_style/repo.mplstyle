@@ -1,21 +1,21 @@
-# Default palette for this repo. Re-rendered charts pick this up.
-axes.facecolor: #FFFFFF
-figure.facecolor: #FFFFFF
+# Scheduler Pulse palette for this repo. Re-rendered charts pick this up.
+axes.facecolor: #FFF8E7
+figure.facecolor: #FFF8E7
 axes.edgecolor: #1c1c1c
 axes.labelcolor: #1c1c1c
 axes.titlecolor: #1c1c1c
 axes.titleweight: bold
 xtick.color: #1c1c1c
 ytick.color: #1c1c1c
-grid.color: #DDDDDD
+grid.color: #E9D8A6
 grid.alpha: 0.5
 axes.grid: True
 axes.spines.top: False
 axes.spines.right: False
-axes.prop_cycle: cycler('color', [#3b6fa1, #c25a4f, #5b8d4a, #e6a23c, #7a7a7a, #9b59b6])
+axes.prop_cycle: cycler('color', [#001219, #005F73, #0A9396, #94D2BD, #EE9B00, #9B2226])
 font.family: sans-serif
 font.sans-serif: Helvetica, Arial, DejaVu Sans
 font.size: 10
 figure.titlesize: 14
 figure.titleweight: bold
-image.cmap: viridis
+image.cmap: turbo
