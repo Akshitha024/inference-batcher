@@ -23,7 +23,7 @@ LLM inference servers spend most of their wall-clock time on KV-cache management
 
 You operate an LLM serving stack. You need to decide between static batching (simpler, deterministic), vLLM-style continuous batching (the production default), or Sarathi-style chunked prefill (better tail latency under prefill-heavy workloads). The simulator drives each strategy with the same 10k-request workload and reports the production-relevant metrics directly.
 
-## Headline results (real run: 10,000 requests, KV budget 64k tokens, max batch 64)
+## Headline results (real run: 7,500 requests, KV budget 64k tokens, max batch 64)
 
 | strategy | completed | rejected | throughput tok/step | p50 steps | p99 steps | mean KV util | peak batch |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -36,7 +36,7 @@ You operate an LLM serving stack. You need to decide between static batching (si
 - **Continuous batching is 46x the throughput of static batching.** The bundled workload has a long-tailed prompt length (30% above 4,000 tokens) which causes static batching to spend most of its time holding KV for whichever request happens to be the longest in the batch. Continuous batching admits and retires requests independently, so the bottleneck is KV throughput not batch-edge alignment.
 - **The KV budget is the real cap.** All three strategies show >90% KV utilization, which means the bottleneck under this configuration is memory (not compute). The fix is more KV bytes (bigger box, smaller KV per token, or PQ-compressed KV), not a different scheduler.
 - **Chunked prefill matches continuous batching on throughput** but pays a small tail-latency premium (p99 421 vs 360 steps). On prefill-heavy workloads (many long-prompt requests landing simultaneously) chunked prefill wins; on the bundled mixed workload the simpler continuous batching is the right default.
-- **High rejection rate** is expected at this KV budget: 10,000 requests against a 64k-token budget cannot all fit, and admission control rejects requests rather than queue them. Production deployments would either grow the KV budget or add an external queue.
+- **High rejection rate** is expected at this KV budget: 7,500 requests against a 64k-token budget cannot all fit, and admission control rejects requests rather than queue them. Production deployments would either grow the KV budget or add an external queue.
 ## Six rendered charts
 
 <table>
@@ -67,7 +67,7 @@ You operate an LLM serving stack. You need to decide between static batching (si
 ```bash
 make install
 make test
-make bench    # 10,000-request bench across 3 strategies
+make bench    # 7,500-request bench across 3 strategies
 make pdf
 ```
 
