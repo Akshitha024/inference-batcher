@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+/runs/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+!docs/research_report.pdf

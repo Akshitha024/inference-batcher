@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.3, pytest-9.0.3, pluggy-1.6.0 -- /Users/mani/Projects/akshitha-portfolio/projects/inference-batcher/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/mani/Projects/akshitha-portfolio/projects/inference-batcher
+configfile: pyproject.toml
+testpaths: tests
+plugins: cov-7.1.0
+collecting ... collected 11 items
+
+tests/test_runner.py::test_runner_smoke PASSED                           [  9%]
+tests/test_scheduler.py::test_completes_small_workload[static_batch] PASSED [ 18%]
+tests/test_scheduler.py::test_completes_small_workload[continuous_batch] PASSED [ 27%]
+tests/test_scheduler.py::test_completes_small_workload[chunked_prefill] PASSED [ 36%]
+tests/test_scheduler.py::test_continuous_batch_higher_throughput_than_static PASSED [ 45%]
+tests/test_scheduler.py::test_kv_budget_causes_rejections PASSED         [ 54%]
+tests/test_workload.py::test_deterministic[11] PASSED                    [ 63%]
+tests/test_workload.py::test_deterministic[17] PASSED                    [ 72%]
+tests/test_workload.py::test_deterministic[23] PASSED                    [ 81%]
+tests/test_workload.py::test_arrival_times_monotonic PASSED              [ 90%]
+tests/test_workload.py::test_has_long_tail PASSED                        [100%]
+
+============================== 11 passed in 0.56s ==============================

@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: inference-batcher
+message: "Continuous-batching inference scheduler simulator."
+authors: [{family-names: "Lingampally", given-names: "Akshitha Reddy"}]
+date-released: "2024-11-25"
+version: "0.4.0"
+license: "MIT"
+url: "https://github.com/Akshitha024/inference-batcher"
